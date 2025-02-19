@@ -5,8 +5,6 @@ title: "Classifying U.S. Congress with AI"
 ```{r}
 
 library(tidyverse)
-#devtools::install_github("albertrapp/tidychatmodels")
-library(tidychatmodels)
 
 source("chrg_pull.R")
 
@@ -18,17 +16,20 @@ dotenv::load_dot_env()
 
 ```{r}
 gov_packages =
-  pull_chrg(key = Sys.getenv("GOV_APIKEY"),
-            pageSize = 3,
+  pull_chrg(key = Sys.getenv("GOV_API_KEY"),
+            pageSize = 7,
             congress= 118)
 gov_zips = 
   gov_packages %>% 
   mutate(zips = paste0(str_replace(packageLink, "summary", "zip"),
-                       "?api_key=", Sys.getenv("GOV_APIKEY"))) %>% 
+                       "?api_key=", Sys.getenv("GOV_API_KEY"))) %>% 
   mutate(destfiles = paste0("zips/",packageId,".zip")) %>% 
-  select(zips, destfiles, packageId)
+  select(zips, destfiles, packageId) %>% 
+  filter(!(packageId %in% 
+           c("CHRG-118hhrg56070","CHRG-118hhrg55834",
+             "CHRG-118hhrg55996")))
 
-#options(timeout=1500)
+options(timeout=1500)
 map2(gov_zips$zips,gov_zips$destfiles,
      function(x,y){download.file(x, y, mode = "wb")})
 
@@ -49,9 +50,11 @@ pdf_df =
     pdfText = list(pdftools::pdf_text(text))
       ) %>% 
   unnest_longer(col = pdfText) %>% 
-  mutate(pdfText = gsub("\\s+", " ", str_trim(pdfText))) %>% 
+  mutate(pdfText = str_squish(pdfText)) %>% 
   select(packageId, pdfText) %>% 
-  aggregate(pdfText ~ packageId, FUN = paste, collapse = "")
+  aggregate(pdfText ~ packageId, FUN = paste, collapse = "") %>% 
+  mutate(text=map(pdfText,\(x){str_trunc(x, 10000, "right")})) %>% 
+  select(name=packageId, text)
 
 ```
 
@@ -65,15 +68,55 @@ pdf_df %>%
 
 
 ```{r}
+library(ellmer)
 
-create_chat(
-  vendor = "openai",
-  api_key = Sys.getenv("GPT_APIKEY")
-) %>% 
-  add_model("gpt-4o") # %>% 
-  # add_message()
+get_gpt_summary = 
+  function(text){
+    
+    type_summary <- type_object(
+      "Summary of hearing.",
+      name = type_string("Name."),
+      num_attended = type_integer("Number of congress people in attendance."),
+      topics = type_array(
+        'Array of topics, e.g. ["tech", "politics", "business"]. Should be as specific as possible, and can overlap.',
+        items = type_string()
+      ),
+      summary = type_string("Summary of the hearing. Two or three sentences max.")
+    )
+    
+    type_hearings_summary <- type_array(items = type_summary)
+    
+    chat <- chat_openai(
+      system_prompt = "You are a chatbot that summarizes congressional hearings."
+    )
+    
+    response = chat$extract_data(text[1], type = type_hearings_summary)
+    
+    return(response)
+  }
 
 
+out_df = 
+    pdf_df %>% 
+    transmute(responses = 
+                map(text, get_gpt_summary,
+                    .progress = TRUE))
+  out_df %>% unnest_wider(responses)
+```
+
+
+
+
+```{r}
+
+
+takeaways = 
+  pdf_df %>% 
+  mutate()
+  mutate(response = map_chr(pdfText, chrg_summary))
+
+chrg_summary(pdf_df[1,] %>% 
+               pull(pdfText))
 
 ```
 
