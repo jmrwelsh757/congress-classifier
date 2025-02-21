@@ -2,19 +2,48 @@
 title: "Classifying U.S. Congress with AI"
 ---
 
-```{r}
+```{r packages, echo=FALSE}
 
 library(tidyverse)
-
-source("chrg_pull.R")
-
 dotenv::load_dot_env()
+load("openai_2-20.RData")
 
 ```
 
+# Reading in congressional hearings
+
+In order to read in pdfs of the hearings, we first need a data.gov API key. Once this is acquired, the function below will pull zip files of all the files from each hearing based on the congress number (as long as it's after 2018).
+
+```{r gov_api, eval=FALSE}
+
+pull_chrg = 
+  function(key=NULL, pageSize=10, congress=118){
+    url =
+      paste0("https://api.govinfo.gov/collections/",
+           "CHRG/",
+           "2018-01-01T20%3A18%3A10Z?",
+           "pageSize=",
+           pageSize,
+           "&",
+           "congress=",
+           congress,
+           "&",
+           "offsetMark=%2A&",
+           "api_key=",
+           key)
+    jsonlite::fromJSON(url)$packages %>% 
+      select(packageId, title, 
+             packageLink, congress, 
+             dateIssued)
+  }
+
+```
+
+Once this function is defined, it can be used to read in zips, and unzip them.
 
 
-```{r}
+```{r gov_pull, eval=FALSE}
+
 gov_packages =
   pull_chrg(key = Sys.getenv("GOV_API_KEY"),
             pageSize = 7,
@@ -24,50 +53,66 @@ gov_zips =
   mutate(zips = paste0(str_replace(packageLink, "summary", "zip"),
                        "?api_key=", Sys.getenv("GOV_API_KEY"))) %>% 
   mutate(destfiles = paste0("zips/",packageId,".zip")) %>% 
-  select(zips, destfiles, packageId) %>% 
-  filter(!(packageId %in% 
-           c("CHRG-118hhrg56070","CHRG-118hhrg55834",
-             "CHRG-118hhrg55996")))
+  select(zips, destfiles, packageId)
 
 options(timeout=1500)
 map2(gov_zips$zips,gov_zips$destfiles,
      function(x,y){download.file(x, y, mode = "wb")})
 
+```
+
+
+```{r pdf_load, eval=FALSE}
+
 pdf_df = 
-  gov_zips %>%
-  mutate(fname = paste0("zips/", gov_zips$packageId,
-                        "/pdf/", 
-                        gov_zips$packageId, ".pdf")) %>% 
-  rowwise() %>% 
-  mutate(
-    text = list(unzip(destfiles,list = T)$Name)
-      ) %>% 
-  unnest_longer(col = text) %>% 
+  ##this was rev one which directly continued with downloaded files instead of reading in from dir.
+  # gov_zips %>%
+  # mutate(fname = paste0("zips/", gov_zips$packageId,
+  #                       "/pdf/", 
+  #                       gov_zips$packageId, ".pdf")) %>% 
+  # rowwise() %>% 
+  # mutate(
+  #   text = list(unzip(destfiles,list = T)$Name)
+  #     ) %>% 
+  
+    ##this is rev two reading in already downloaded files from dir
+  tibble(text = list.files(recursive = TRUE)) %>% 
+  # unnest_longer(col = text) %>% 
   filter(str_detect(text,".pdf")) %>% 
-  rowwise() %>% 
+  # rowwise() %>% 
   mutate(
-    text = list(unzip(destfiles,files = text)),
-    pdfText = list(pdftools::pdf_text(text))
+    # text = list(unzip(destfiles,files = text)),
+    pdfText = map(text, pdftools::pdf_text)
       ) %>% 
   unnest_longer(col = pdfText) %>% 
-  mutate(pdfText = str_squish(pdfText)) %>% 
-  select(packageId, pdfText) %>% 
+  transmute(pdfText = str_squish(pdfText),
+         packageId = str_sub(text, 
+                             start = 1,
+                             end = str_locate(text,"/")[2] - 1)) %>% 
   aggregate(pdfText ~ packageId, FUN = paste, collapse = "") %>% 
-  mutate(text=map(pdfText,\(x){str_trunc(x, 10000, "right")})) %>% 
-  select(name=packageId, text)
+  mutate(text=map(pdfText,\(hearing){word(hearing, 1, (30000/2) )})) %>% #max tokens divided by average tokens per word in English (1.5) plus .5 since congress likes the big words
+  select(name=packageId, text) %>% 
+  filter(!is.na(text))
 
 ```
 
 
-```{r}
+```{r gt_preview}
 
-pdf_df %>% 
+pdf_df[1,] %>% 
+  mutate(text = str_trunc(text,450)) %>% 
   gt::gt()
 
 ```
 
+# AI analysis
 
-```{r}
+Now that the loading and text processing of the pdfs is complete, the text data can be sent to an ai chatbot. We will use openai's gpt-4o model. The *ellmer* package allows connection to many different ai APIs. *ellmer* also allows meticulous specification of what datatype to return. The better the return type is specified, the more useful the ai helper's response.
+
+I run the analysis below. This analysis costs about 40 cents to run with current token rates for the openai api for gpt-4o.
+
+
+```{r llm, eval=FALSE}
 library(ellmer)
 
 get_gpt_summary = 
@@ -77,11 +122,21 @@ get_gpt_summary =
       "Summary of hearing.",
       name = type_string("Name."),
       num_attended = type_integer("Number of congress people in attendance."),
-      topics = type_array(
-        'Array of topics, e.g. ["tech", "politics", "business"]. Should be as specific as possible, and can overlap.',
-        items = type_string()
+      num_reps = type_integer("Number of republican congress people in attendance."),
+      num_dems = type_integer("Number of democrat congress people in attendance."),
+      topics = type_enum(
+        'Topic of the hearing',
+      values = c(
+        "Environment",
+        "Immigration",
+        "Law Enforcement",
+        "Emergency Response",
+        "Agriculture",
+        "Housing",
+        "Technology",
+        "Business"),
       ),
-      summary = type_string("Summary of the hearing. Two or three sentences max.")
+      summary = type_string("Summary of the hearing. 100 words max.")
     )
     
     type_hearings_summary <- type_array(items = type_summary)
@@ -101,22 +156,21 @@ out_df =
     transmute(responses = 
                 map(text, get_gpt_summary,
                     .progress = TRUE))
-  out_df %>% unnest_wider(responses)
 ```
 
 
+# Results
 
+Now that the chatbot has been able to read the text of the pdfs and return answers for each function call, the results just need to be unnested into a dataframe.
 
-```{r}
+```{r result_df}
 
-
-takeaways = 
-  pdf_df %>% 
-  mutate()
-  mutate(response = map_chr(pdfText, chrg_summary))
-
-chrg_summary(pdf_df[1,] %>% 
-               pull(pdfText))
+out_df %>% 
+  unnest_wider(responses) %>% 
+  gt::gt()
 
 ```
 
+Now the reader has a succinct summary of each hearing and can perform analysis on attendance by topic in order to derive which topics may be the most important to the congress.
+
+Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the options the chatbot picks from then a stronger, more informative pattern could be found. 
