@@ -178,6 +178,11 @@ out_df %>%
              num_reps="republicans",
              num_dems="democrats",
              topics="topic") %>% 
+  cols_width(name ~ px(70),
+             num_reps ~ px(90),
+             num_dems ~ px(90),
+             num_attended ~ px(50),
+             topics ~ px(90)) %>% 
   gt_theme_538()
 
 ```
