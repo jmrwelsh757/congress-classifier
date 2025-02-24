@@ -165,9 +165,20 @@ Now that the chatbot has been able to read the text of the pdfs and return answe
 
 ```{r result_df}
 
+library(gt)
+library(gtExtras)
 out_df %>% 
   unnest_wider(responses) %>% 
-  gt::gt()
+  gt() %>% 
+  tab_header(title = "U.S. Congressional Hearings",
+             subtitle = "AI summary of hearings based on pdf text extracted from the U.S. Government API") %>% 
+  tab_spanner(label = "Attendance",
+              columns = num_attended:num_dems) %>% 
+  cols_label(num_attended="total",
+             num_reps="republicans",
+             num_dems="democrats",
+             topics="topic") %>% 
+  gt_theme_538()
 
 ```
 
