@@ -24,7 +24,7 @@ load("openai_2-20.RData")
 
 In order to read in pdfs of the hearings, we first need a data.gov API key. Once this is acquired, the function below will pull zip files of all the files from each hearing based on the congress number (as long as it's after 2018).
 
-```{r gov_api, eval=FALSE}
+```{r gov_api, eval=FALSE, echo=TRUE}
 
 pull_chrg = 
   function(key=NULL, pageSize=10, congress=118){
@@ -70,7 +70,7 @@ map2(gov_zips$zips,gov_zips$destfiles,
 
 ```
 
-```{r pdf_load, eval=FALSE}
+```{r pdf_load, eval=FALSE, echo=TRUE}
 
 pdf_df = 
   ##this was rev one which directly continued with downloaded files instead of reading in from dir.
@@ -115,11 +115,11 @@ pdf_df[1,] %>%
 
 ## AI analysis
 
-Now that the loading and text processing of the pdfs is complete, the text data can be sent to an ai chatbot. We will use openai's gpt-4o model. The *ellmer* package allows connection to many different ai APIs. *ellmer* also allows meticulous specification of what datatype to return. The better the return type is specified, the more useful the ai helper's response.
+Now that the loading and text processing of the pdfs is complete, the text data can be sent to an AI chatbot. We will use openai's gpt-4o model. The *ellmer* package allows connection to many different AI APIs. *ellmer* also allows meticulous specification of what datatype to return. The better the return type is specified, the more useful the AI helper's response.
 
 I run the analysis below. This analysis costs about 40 cents to run with current token rates for the openai api for gpt-4o.
 
-```{r llm, eval=FALSE}
+```{r llm, eval=FALSE, echo=TRUE}
 library(ellmer)
 
 get_gpt_summary = 
