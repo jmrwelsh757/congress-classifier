@@ -20,40 +20,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -146,7 +112,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#reading-in-congressional-hearings" id="toc-reading-in-congressional-hearings" class="nav-link active" data-scroll-target="#reading-in-congressional-hearings">Reading in congressional hearings</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#reading-in-congressional-hearings" id="toc-reading-in-congressional-hearings" class="nav-link" data-scroll-target="#reading-in-congressional-hearings">Reading in congressional hearings</a></li>
   <li><a href="#ai-analysis" id="toc-ai-analysis" class="nav-link" data-scroll-target="#ai-analysis">AI analysis</a></li>
   <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">Results</a></li>
   </ul>
@@ -174,101 +141,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<div class="cell">
-<div class="cell-output cell-output-stderr">
-<pre><code>── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
-✔ dplyr     1.1.4     ✔ readr     2.1.5
-✔ forcats   1.0.0     ✔ stringr   1.5.1
-✔ ggplot2   3.5.1     ✔ tibble    3.2.1
-✔ lubridate 1.9.3     ✔ tidyr     1.3.1
-✔ purrr     1.0.2     
-── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
-✖ dplyr::filter() masks stats::filter()
-✖ dplyr::lag()    masks stats::lag()
-ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in readLines(file): incomplete final line found on '.env'
-Warning in readLines(file): incomplete final line found on '.env'</code></pre>
-</div>
-</div>
-<section id="reading-in-congressional-hearings" class="level1">
-<h1>Reading in congressional hearings</h1>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>Are you the kind of person who skips to the bottom of a Reddit post to read the TL;DR to see if you are really interested in the story before reading the full text? Are you often frustrated when a friend includes unnecessary details that cause their stories to drag on and on? If so, reading a congressional hearing transcript may be the trigger you absolutely don’t need right now. Fortunately, data analysis tools have progressed so that computers can read and generate text, providing you with a way out of reading pages of text just to get a summary of key points.</p>
+<p>This analysis trains an LLM on text and requests summary data in order to understand the significance of a hearing without reading or listening to the full transcript. I scrape pdfs of congressional transcripts from the data.gov web API and feed the text to OpenAI’s gpt-4o model, using specific response type definitions and prompts in order to elicit the correct summary info from the LLM.</p>
+<p>AI Large Language Models (LLMs) are very powerful for predicting the next “token” in a sentence. Tokens are to a sentence like the bricks that make up a house. A token by itself may just be “Fly”, but an LLM may be able to predict “me”, “to”, “the”, and “moon” would follow the first token if it is first trained on popular Frank Sinatra songs. This analysis takes advantage of that powerful ability to create insights from U.S. congressional hearings transcripts.</p>
+</section>
+<section id="reading-in-congressional-hearings" class="level2">
+<h2 class="anchored" data-anchor-id="reading-in-congressional-hearings">Reading in congressional hearings</h2>
 <p>In order to read in pdfs of the hearings, we first need a data.gov API key. Once this is acquired, the function below will pull zip files of all the files from each hearing based on the congress number (as long as it’s after 2018).</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>pull_chrg <span class="ot">=</span> </span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(<span class="at">key=</span><span class="cn">NULL</span>, <span class="at">pageSize=</span><span class="dv">10</span>, <span class="at">congress=</span><span class="dv">118</span>){</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    url <span class="ot">=</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>      <span class="fu">paste0</span>(<span class="st">"https://api.govinfo.gov/collections/"</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>           <span class="st">"CHRG/"</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>           <span class="st">"2018-01-01T20%3A18%3A10Z?"</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>           <span class="st">"pageSize="</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>           pageSize,</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>           <span class="st">"&amp;"</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>           <span class="st">"congress="</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>           congress,</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>           <span class="st">"&amp;"</span>,</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>           <span class="st">"offsetMark=%2A&amp;"</span>,</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>           <span class="st">"api_key="</span>,</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>           key)</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(url)<span class="sc">$</span>packages <span class="sc">%&gt;%</span> </span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(packageId, title, </span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>             packageLink, congress, </span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>             dateIssued)</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  }</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
 <p>Once this function is defined, it can be used to read in zips, and unzip them.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>gov_packages <span class="ot">=</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull_chrg</span>(<span class="at">key =</span> <span class="fu">Sys.getenv</span>(<span class="st">"GOV_API_KEY"</span>),</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>            <span class="at">pageSize =</span> <span class="dv">7</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>            <span class="at">congress=</span> <span class="dv">118</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>gov_zips <span class="ot">=</span> </span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  gov_packages <span class="sc">%&gt;%</span> </span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">zips =</span> <span class="fu">paste0</span>(<span class="fu">str_replace</span>(packageLink, <span class="st">"summary"</span>, <span class="st">"zip"</span>),</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>                       <span class="st">"?api_key="</span>, <span class="fu">Sys.getenv</span>(<span class="st">"GOV_API_KEY"</span>))) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">destfiles =</span> <span class="fu">paste0</span>(<span class="st">"zips/"</span>,packageId,<span class="st">".zip"</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(zips, destfiles, packageId)</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">timeout=</span><span class="dv">1500</span>)</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu">map2</span>(gov_zips<span class="sc">$</span>zips,gov_zips<span class="sc">$</span>destfiles,</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>     <span class="cf">function</span>(x,y){<span class="fu">download.file</span>(x, y, <span class="at">mode =</span> <span class="st">"wb"</span>)})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>pdf_df <span class="ot">=</span> </span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="do">##this was rev one which directly continued with downloaded files instead of reading in from dir.</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># gov_zips %&gt;%</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(fname = paste0("zips/", gov_zips$packageId,</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">#                       "/pdf/", </span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">#                       gov_zips$packageId, ".pdf")) %&gt;% </span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># rowwise() %&gt;% </span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   text = list(unzip(destfiles,list = T)$Name)</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     ) %&gt;% </span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="do">##this is rev two reading in already downloaded files from dir</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">text =</span> <span class="fu">list.files</span>(<span class="at">recursive =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># unnest_longer(col = text) %&gt;% </span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(text,<span class="st">".pdf"</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># rowwise() %&gt;% </span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># text = list(unzip(destfiles,files = text)),</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">pdfText =</span> <span class="fu">map</span>(text, pdftools<span class="sc">::</span>pdf_text)</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>      ) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unnest_longer</span>(<span class="at">col =</span> pdfText) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(<span class="at">pdfText =</span> <span class="fu">str_squish</span>(pdfText),</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>         <span class="at">packageId =</span> <span class="fu">str_sub</span>(text, </span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>                             <span class="at">start =</span> <span class="dv">1</span>,</span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>                             <span class="at">end =</span> <span class="fu">str_locate</span>(text,<span class="st">"/"</span>)[<span class="dv">2</span>] <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aggregate</span>(pdfText <span class="sc">~</span> packageId, <span class="at">FUN =</span> paste, <span class="at">collapse =</span> <span class="st">""</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">text=</span><span class="fu">map</span>(pdfText,\(hearing){<span class="fu">word</span>(hearing, <span class="dv">1</span>, (<span class="dv">30000</span><span class="sc">/</span><span class="dv">2</span>) )})) <span class="sc">%&gt;%</span> <span class="co">#max tokens divided by average tokens per word in English (1.5) plus .5 since congress likes the big words</span></span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">name=</span>packageId, text) <span class="sc">%&gt;%</span> </span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(text))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>pdf_df[<span class="dv">1</span>,] <span class="sc">%&gt;%</span> </span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">text =</span> <span class="fu">str_trunc</span>(text,<span class="dv">450</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  gt<span class="sc">::</span><span class="fu">gt</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div id="ohgbdltfch" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>#ohgbdltfch table {
@@ -739,85 +622,15 @@ Warning in readLines(file): incomplete final line found on '.env'</code></pre>
 </div>
 </div>
 </section>
-<section id="ai-analysis" class="level1">
-<h1>AI analysis</h1>
+<section id="ai-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="ai-analysis">AI analysis</h2>
 <p>Now that the loading and text processing of the pdfs is complete, the text data can be sent to an ai chatbot. We will use openai’s gpt-4o model. The <em>ellmer</em> package allows connection to many different ai APIs. <em>ellmer</em> also allows meticulous specification of what datatype to return. The better the return type is specified, the more useful the ai helper’s response.</p>
 <p>I run the analysis below. This analysis costs about 40 cents to run with current token rates for the openai api for gpt-4o.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ellmer)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>get_gpt_summary <span class="ot">=</span> </span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(text){</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    type_summary <span class="ot">&lt;-</span> <span class="fu">type_object</span>(</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Summary of hearing."</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">name =</span> <span class="fu">type_string</span>(<span class="st">"Name."</span>),</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">num_attended =</span> <span class="fu">type_integer</span>(<span class="st">"Number of congress people in attendance."</span>),</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">num_reps =</span> <span class="fu">type_integer</span>(<span class="st">"Number of republican congress people in attendance."</span>),</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">num_dems =</span> <span class="fu">type_integer</span>(<span class="st">"Number of democrat congress people in attendance."</span>),</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>      <span class="at">topics =</span> <span class="fu">type_enum</span>(</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">'Topic of the hearing'</span>,</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>      <span class="at">values =</span> <span class="fu">c</span>(</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Environment"</span>,</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Immigration"</span>,</span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Law Enforcement"</span>,</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Emergency Response"</span>,</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Agriculture"</span>,</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Housing"</span>,</span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Technology"</span>,</span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Business"</span>),</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>      ),</span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>      <span class="at">summary =</span> <span class="fu">type_string</span>(<span class="st">"Summary of the hearing. 100 words max."</span>)</span>
-<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    type_hearings_summary <span class="ot">&lt;-</span> <span class="fu">type_array</span>(<span class="at">items =</span> type_summary)</span>
-<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    chat <span class="ot">&lt;-</span> <span class="fu">chat_openai</span>(</span>
-<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>      <span class="at">system_prompt =</span> <span class="st">"You are a chatbot that summarizes congressional hearings."</span></span>
-<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>    response <span class="ot">=</span> chat<span class="sc">$</span><span class="fu">extract_data</span>(text[<span class="dv">1</span>], <span class="at">type =</span> type_hearings_summary)</span>
-<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(response)</span>
-<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>out_df <span class="ot">=</span> </span>
-<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>    pdf_df <span class="sc">%&gt;%</span> </span>
-<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>    <span class="fu">transmute</span>(<span class="at">responses =</span> </span>
-<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>                <span class="fu">map</span>(text, get_gpt_summary,</span>
-<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>                    <span class="at">.progress =</span> <span class="cn">TRUE</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
 </section>
-<section id="results" class="level1">
-<h1>Results</h1>
+<section id="results" class="level2">
+<h2 class="anchored" data-anchor-id="results">Results</h2>
 <p>Now that the chatbot has been able to read the text of the pdfs and return answers for each function call, the results just need to be unnested into a dataframe.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gt)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning: package 'gt' was built under R version 4.4.2</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gtExtras)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning: package 'gtExtras' was built under R version 4.4.2</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>out_df <span class="sc">%&gt;%</span> </span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unnest_wider</span>(responses) <span class="sc">%&gt;%</span> </span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">gt</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tab_header</span>(<span class="at">title =</span> <span class="st">"U.S. Congressional Hearings"</span>,</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>             <span class="at">subtitle =</span> <span class="st">"AI summary of hearings based on pdf text extracted from the U.S. Government API"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tab_spanner</span>(<span class="at">label =</span> <span class="st">"Attendance"</span>,</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>              <span class="at">columns =</span> num_attended<span class="sc">:</span>num_dems) <span class="sc">%&gt;%</span> </span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cols_label</span>(<span class="at">num_attended=</span><span class="st">"total"</span>,</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>             <span class="at">num_reps=</span><span class="st">"republicans"</span>,</span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>             <span class="at">num_dems=</span><span class="st">"democrats"</span>,</span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>             <span class="at">topics=</span><span class="st">"topic"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cols_width</span>(name <span class="sc">~</span> <span class="fu">px</span>(<span class="dv">70</span>),</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>             num_reps <span class="sc">~</span> <span class="fu">px</span>(<span class="dv">90</span>),</span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>             num_dems <span class="sc">~</span> <span class="fu">px</span>(<span class="dv">90</span>),</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>             num_attended <span class="sc">~</span> <span class="fu">px</span>(<span class="dv">50</span>),</span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>             topics <span class="sc">~</span> <span class="fu">px</span>(<span class="dv">90</span>)) <span class="sc">%&gt;%</span> </span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">gt_theme_538</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div id="wydktkzpco" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>@import url("https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
@@ -1363,7 +1176,7 @@ Attendance
 </div>
 </div>
 <p>Now the reader has a succinct summary of each hearing and can perform analysis on attendance by topic in order to derive which topics may be the most important to the congress.</p>
-<p>Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the options the chatbot picks from then a stronger, more informative pattern could be found.</p>
+<p>Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the return type options the model picks from, then the model finds stronger, more informative insights.</p>
 
 
 </section>

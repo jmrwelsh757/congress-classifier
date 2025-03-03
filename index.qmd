@@ -1,16 +1,26 @@
 ---
 title: "Classifying U.S. Congress with AI"
 ---
+## Summary
 
-```{r packages, echo=FALSE}
+Are you the kind of person who skips to the bottom of a Reddit post to read the TL;DR to see if you are really interested in the story before reading the full text? Are you often frustrated when a friend includes unnecessary details that cause their stories to drag on and on? If so, reading a congressional hearing transcript may be the trigger you absolutely don't need right now. Fortunately, data analysis tools have progressed so that computers can read and generate text, providing you with a way out of reading pages of text just to get a summary of key points.
+
+This analysis trains an LLM on text and requests summary data in order to understand the significance of a hearing without reading or listening to the full transcript. I scrape pdfs of congressional transcripts from the data.gov web API and feed the text to OpenAI's gpt-4o model, using specific response type definitions and prompts in order to elicit the correct summary info from the LLM. 
+
+AI Large Language Models (LLMs) are very powerful for predicting the next "token" in a sentence. Tokens are to a sentence like the bricks that make up a house. A token by itself may just be "Fly ", but an LLM may be able to predict "me ", "to ", "the ", and "moon " would follow the first token if it is first trained on popular Frank Sinatra songs. This analysis takes advantage of that powerful ability to create insights from U.S. congressional hearings transcripts.
+```{r packages, echo=FALSE, warning=FALSE, message=FALSE}
 
 library(tidyverse)
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE)
 dotenv::load_dot_env()
 load("openai_2-20.RData")
 
 ```
 
-# Reading in congressional hearings
+## Reading in congressional hearings
 
 In order to read in pdfs of the hearings, we first need a data.gov API key. Once this is acquired, the function below will pull zip files of all the files from each hearing based on the congress number (as long as it's after 2018).
 
@@ -41,7 +51,6 @@ pull_chrg =
 
 Once this function is defined, it can be used to read in zips, and unzip them.
 
-
 ```{r gov_pull, eval=FALSE}
 
 gov_packages =
@@ -60,7 +69,6 @@ map2(gov_zips$zips,gov_zips$destfiles,
      function(x,y){download.file(x, y, mode = "wb")})
 
 ```
-
 
 ```{r pdf_load, eval=FALSE}
 
@@ -105,12 +113,11 @@ pdf_df[1,] %>%
 
 ```
 
-# AI analysis
+## AI analysis
 
 Now that the loading and text processing of the pdfs is complete, the text data can be sent to an ai chatbot. We will use openai's gpt-4o model. The *ellmer* package allows connection to many different ai APIs. *ellmer* also allows meticulous specification of what datatype to return. The better the return type is specified, the more useful the ai helper's response.
 
 I run the analysis below. This analysis costs about 40 cents to run with current token rates for the openai api for gpt-4o.
-
 
 ```{r llm, eval=FALSE}
 library(ellmer)
@@ -159,7 +166,7 @@ out_df =
 ```
 
 
-# Results
+## Results
 
 Now that the chatbot has been able to read the text of the pdfs and return answers for each function call, the results just need to be unnested into a dataframe.
 
@@ -189,4 +196,4 @@ out_df %>%
 
 Now the reader has a succinct summary of each hearing and can perform analysis on attendance by topic in order to derive which topics may be the most important to the congress.
 
-Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the options the chatbot picks from then a stronger, more informative pattern could be found. 
+Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the return type options the model picks from, then the model finds stronger, more informative insights. 
