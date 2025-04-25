@@ -1,5 +1,5 @@
 ---
-title: "AI Data Enrichment of U.S. Congressional Hearings Data"
+title: "Classifying U.S. Congress with AI"
 author: "Joseph Welsh"
 ---
 ## Summary
@@ -74,16 +74,21 @@ map2(gov_zips$zips,gov_zips$destfiles,
 ```{r pdf_load, eval=FALSE, echo=TRUE}
 
 pdf_df = 
-  gov_zips |>
-  mutate(fname = paste0("zips/", gov_zips$packageId,
-                        "/pdf/",
-                        gov_zips$packageId, ".pdf")) |>
-  rowwise() |>
-  mutate(
-    text = list(unzip(destfiles,list = T)$Name)
-      ) |>
-  unnest_longer(col = text) |>
-  rowwise() |>
+  ##this was rev one which directly continued with downloaded files instead of reading in from dir.
+  # gov_zips |>
+  # mutate(fname = paste0("zips/", gov_zips$packageId,
+  #                       "/pdf/", 
+  #                       gov_zips$packageId, ".pdf")) |> 
+  # rowwise() |> 
+  # mutate(
+  #   text = list(unzip(destfiles,list = T)$Name)
+  #     ) |> 
+  
+    ##this is rev two reading in already downloaded files from dir
+  tibble(text = list.files(recursive = TRUE)) |> 
+  # unnest_longer(col = text) |> 
+  filter(str_detect(text,".pdf")) |> 
+  # rowwise() |> 
   mutate(
     # text = list(unzip(destfiles,files = text)),
     pdfText = map(text, pdftools::pdf_text)
@@ -102,7 +107,9 @@ pdf_df =
 
 
 ```{r gt_preview}
-
+#| warning: false
+#| message: false
+#| error: false
 pdf_df[1,] |> 
   mutate(text = str_trunc(text,450)) |> 
   gt::gt()
@@ -192,4 +199,4 @@ out_df |>
 
 Now the reader has a succinct summary of each hearing and can perform analysis on attendance by topic in order to derive which topics may be the most important to the congress.
 
-Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the return type options the model picks from, then the model finds stronger, more informative insights. 
+Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the return type options the model picks from, then the model finds stronger, more enriched insights. 
