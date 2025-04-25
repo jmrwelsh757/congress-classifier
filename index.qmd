@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = FALSE,
                       message = FALSE,
                       error = FALSE)
 dotenv::load_dot_env()
-load("openai_2-20.RData")
+load("openai_4_25.RData")
 
 ```
 

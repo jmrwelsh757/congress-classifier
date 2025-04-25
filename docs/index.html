@@ -8,7 +8,7 @@
 
 <meta name="author" content="Joseph Welsh">
 
-<title>AI Data Enrichment of U.S. Congressional Hearings Data – congress-classifier</title>
+<title>Classifying U.S. Congress with AI – congress-classifier</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -159,7 +159,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">AI Data Enrichment of U.S. Congressional Hearings Data</h1>
+<h1 class="title">Classifying U.S. Congress with AI</h1>
 </div>
 
 
@@ -216,49 +216,54 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Once this function is defined, it can be used to read in zips, and unzip them.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>pdf_df <span class="ot">=</span> </span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  gov_zips <span class="sc">|&gt;</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fname =</span> <span class="fu">paste0</span>(<span class="st">"zips/"</span>, gov_zips<span class="sc">$</span>packageId,</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                        <span class="st">"/pdf/"</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                        gov_zips<span class="sc">$</span>packageId, <span class="st">".pdf"</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rowwise</span>() <span class="sc">|&gt;</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">text =</span> <span class="fu">list</span>(<span class="fu">unzip</span>(destfiles,<span class="at">list =</span> T)<span class="sc">$</span>Name)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>      ) <span class="sc">|&gt;</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unnest_longer</span>(<span class="at">col =</span> text) <span class="sc">|&gt;</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rowwise</span>() <span class="sc">|&gt;</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="co"># text = list(unzip(destfiles,files = text)),</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">pdfText =</span> <span class="fu">map</span>(text, pdftools<span class="sc">::</span>pdf_text)</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>      ) <span class="sc">|&gt;</span> </span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unnest_longer</span>(<span class="at">col =</span> pdfText) <span class="sc">|&gt;</span> </span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(<span class="at">pdfText =</span> <span class="fu">str_squish</span>(pdfText),</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>         <span class="at">packageId =</span> <span class="fu">str_sub</span>(text, </span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>                             <span class="at">start =</span> <span class="dv">1</span>,</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>                             <span class="at">end =</span> <span class="fu">str_locate</span>(text,<span class="st">"/"</span>)[<span class="dv">2</span>] <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aggregate</span>(pdfText <span class="sc">~</span> packageId, <span class="at">FUN =</span> paste, <span class="at">collapse =</span> <span class="st">""</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">text=</span><span class="fu">map</span>(pdfText,\(hearing){<span class="fu">word</span>(hearing, <span class="dv">1</span>, (<span class="dv">30000</span><span class="sc">/</span><span class="dv">2</span>) )})) <span class="sc">|&gt;</span> <span class="co">#max tokens divided by average tokens per word in English (1.5) plus .5 since congress likes the big words</span></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">name=</span>packageId, text) <span class="sc">|&gt;</span> </span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(text))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="do">##this was rev one which directly continued with downloaded files instead of reading in from dir.</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># gov_zips |&gt;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(fname = paste0("zips/", gov_zips$packageId,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">#                       "/pdf/", </span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">#                       gov_zips$packageId, ".pdf")) |&gt; </span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># rowwise() |&gt; </span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   text = list(unzip(destfiles,list = T)$Name)</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     ) |&gt; </span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="do">##this is rev two reading in already downloaded files from dir</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">text =</span> <span class="fu">list.files</span>(<span class="at">recursive =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># unnest_longer(col = text) |&gt; </span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(text,<span class="st">".pdf"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># rowwise() |&gt; </span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># text = list(unzip(destfiles,files = text)),</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">pdfText =</span> <span class="fu">map</span>(text, pdftools<span class="sc">::</span>pdf_text)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>      ) <span class="sc">|&gt;</span> </span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unnest_longer</span>(<span class="at">col =</span> pdfText) <span class="sc">|&gt;</span> </span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">transmute</span>(<span class="at">pdfText =</span> <span class="fu">str_squish</span>(pdfText),</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>         <span class="at">packageId =</span> <span class="fu">str_sub</span>(text, </span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>                             <span class="at">start =</span> <span class="dv">1</span>,</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>                             <span class="at">end =</span> <span class="fu">str_locate</span>(text,<span class="st">"/"</span>)[<span class="dv">2</span>] <span class="sc">-</span> <span class="dv">1</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aggregate</span>(pdfText <span class="sc">~</span> packageId, <span class="at">FUN =</span> paste, <span class="at">collapse =</span> <span class="st">""</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">text=</span><span class="fu">map</span>(pdfText,\(hearing){<span class="fu">word</span>(hearing, <span class="dv">1</span>, (<span class="dv">30000</span><span class="sc">/</span><span class="dv">2</span>) )})) <span class="sc">|&gt;</span> <span class="co">#max tokens divided by average tokens per word in English (1.5) plus .5 since congress likes the big words</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">name=</span>packageId, text) <span class="sc">|&gt;</span> </span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(text))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
-<div id="ohgbdltfch" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#ohgbdltfch table {
+<div id="wtjpolrsts" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#wtjpolrsts table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#ohgbdltfch thead, #ohgbdltfch tbody, #ohgbdltfch tfoot, #ohgbdltfch tr, #ohgbdltfch td, #ohgbdltfch th {
+#wtjpolrsts thead, #wtjpolrsts tbody, #wtjpolrsts tfoot, #wtjpolrsts tr, #wtjpolrsts td, #wtjpolrsts th {
   border-style: none;
 }
 
-#ohgbdltfch p {
+#wtjpolrsts p {
   margin: 0;
   padding: 0;
 }
 
-#ohgbdltfch .gt_table {
+#wtjpolrsts .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -284,12 +289,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-left-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_caption {
+#wtjpolrsts .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#ohgbdltfch .gt_title {
+#wtjpolrsts .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -301,7 +306,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-width: 0;
 }
 
-#ohgbdltfch .gt_subtitle {
+#wtjpolrsts .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -313,7 +318,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-width: 0;
 }
 
-#ohgbdltfch .gt_heading {
+#wtjpolrsts .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -325,13 +330,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_bottom_border {
+#wtjpolrsts .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_col_headings {
+#wtjpolrsts .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -346,7 +351,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_col_heading {
+#wtjpolrsts .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -366,7 +371,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#ohgbdltfch .gt_column_spanner_outer {
+#wtjpolrsts .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -378,15 +383,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 4px;
 }
 
-#ohgbdltfch .gt_column_spanner_outer:first-child {
+#wtjpolrsts .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#ohgbdltfch .gt_column_spanner_outer:last-child {
+#wtjpolrsts .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#ohgbdltfch .gt_column_spanner {
+#wtjpolrsts .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -398,11 +403,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   width: 100%;
 }
 
-#ohgbdltfch .gt_spanner_row {
+#wtjpolrsts .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#ohgbdltfch .gt_group_heading {
+#wtjpolrsts .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -428,7 +433,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   text-align: left;
 }
 
-#ohgbdltfch .gt_empty_group_heading {
+#wtjpolrsts .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -443,15 +448,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: middle;
 }
 
-#ohgbdltfch .gt_from_md > :first-child {
+#wtjpolrsts .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#ohgbdltfch .gt_from_md > :last-child {
+#wtjpolrsts .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#ohgbdltfch .gt_row {
+#wtjpolrsts .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -470,7 +475,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#ohgbdltfch .gt_stub {
+#wtjpolrsts .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -483,7 +488,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#ohgbdltfch .gt_stub_row_group {
+#wtjpolrsts .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -497,15 +502,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: top;
 }
 
-#ohgbdltfch .gt_row_group_first td {
+#wtjpolrsts .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#ohgbdltfch .gt_row_group_first th {
+#wtjpolrsts .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#ohgbdltfch .gt_summary_row {
+#wtjpolrsts .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -515,16 +520,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#ohgbdltfch .gt_first_summary_row {
+#wtjpolrsts .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_first_summary_row.thick {
+#wtjpolrsts .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#ohgbdltfch .gt_last_summary_row {
+#wtjpolrsts .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -534,7 +539,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_grand_summary_row {
+#wtjpolrsts .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -544,7 +549,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#ohgbdltfch .gt_first_grand_summary_row {
+#wtjpolrsts .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -554,7 +559,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_last_grand_summary_row_top {
+#wtjpolrsts .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -564,11 +569,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_striped {
+#wtjpolrsts .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#ohgbdltfch .gt_table_body {
+#wtjpolrsts .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -577,7 +582,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_footnotes {
+#wtjpolrsts .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -591,7 +596,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_footnote {
+#wtjpolrsts .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -600,7 +605,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#ohgbdltfch .gt_sourcenotes {
+#wtjpolrsts .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -614,7 +619,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#ohgbdltfch .gt_sourcenote {
+#wtjpolrsts .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -622,72 +627,72 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#ohgbdltfch .gt_left {
+#wtjpolrsts .gt_left {
   text-align: left;
 }
 
-#ohgbdltfch .gt_center {
+#wtjpolrsts .gt_center {
   text-align: center;
 }
 
-#ohgbdltfch .gt_right {
+#wtjpolrsts .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#ohgbdltfch .gt_font_normal {
+#wtjpolrsts .gt_font_normal {
   font-weight: normal;
 }
 
-#ohgbdltfch .gt_font_bold {
+#wtjpolrsts .gt_font_bold {
   font-weight: bold;
 }
 
-#ohgbdltfch .gt_font_italic {
+#wtjpolrsts .gt_font_italic {
   font-style: italic;
 }
 
-#ohgbdltfch .gt_super {
+#wtjpolrsts .gt_super {
   font-size: 65%;
 }
 
-#ohgbdltfch .gt_footnote_marks {
+#wtjpolrsts .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#ohgbdltfch .gt_asterisk {
+#wtjpolrsts .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#ohgbdltfch .gt_indent_1 {
+#wtjpolrsts .gt_indent_1 {
   text-indent: 5px;
 }
 
-#ohgbdltfch .gt_indent_2 {
+#wtjpolrsts .gt_indent_2 {
   text-indent: 10px;
 }
 
-#ohgbdltfch .gt_indent_3 {
+#wtjpolrsts .gt_indent_3 {
   text-indent: 15px;
 }
 
-#ohgbdltfch .gt_indent_4 {
+#wtjpolrsts .gt_indent_4 {
   text-indent: 20px;
 }
 
-#ohgbdltfch .gt_indent_5 {
+#wtjpolrsts .gt_indent_5 {
   text-indent: 25px;
 }
 
-#ohgbdltfch .katex-display {
+#wtjpolrsts .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#ohgbdltfch div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#wtjpolrsts div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -766,27 +771,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Now that the chatbot has been able to read the text of the pdfs and return answers for each function call, the results just need to be unnested into a dataframe.</p>
 <div class="cell">
 <div class="cell-output-display">
-<div id="wydktkzpco" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="lwjusvsboe" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>@import url("https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Cairo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
-#wydktkzpco table {
+#lwjusvsboe table {
   font-family: Cairo, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#wydktkzpco thead, #wydktkzpco tbody, #wydktkzpco tfoot, #wydktkzpco tr, #wydktkzpco td, #wydktkzpco th {
+#lwjusvsboe thead, #lwjusvsboe tbody, #lwjusvsboe tfoot, #lwjusvsboe tr, #lwjusvsboe td, #lwjusvsboe th {
   border-style: none;
 }
 
-#wydktkzpco p {
+#lwjusvsboe p {
   margin: 0;
   padding: 0;
 }
 
-#wydktkzpco .gt_table {
+#lwjusvsboe .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -812,12 +817,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-left-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_caption {
+#lwjusvsboe .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#wydktkzpco .gt_title {
+#lwjusvsboe .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -829,7 +834,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-width: 0;
 }
 
-#wydktkzpco .gt_subtitle {
+#lwjusvsboe .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -841,7 +846,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-width: 0;
 }
 
-#wydktkzpco .gt_heading {
+#lwjusvsboe .gt_heading {
   background-color: #FFFFFF;
   text-align: left;
   border-bottom-color: #FFFFFF;
@@ -853,13 +858,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_bottom_border {
+#lwjusvsboe .gt_bottom_border {
   border-bottom-style: none;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_col_headings {
+#lwjusvsboe .gt_col_headings {
   border-top-style: none;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -874,7 +879,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_col_heading {
+#lwjusvsboe .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -894,7 +899,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#wydktkzpco .gt_column_spanner_outer {
+#lwjusvsboe .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -906,15 +911,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 4px;
 }
 
-#wydktkzpco .gt_column_spanner_outer:first-child {
+#lwjusvsboe .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#wydktkzpco .gt_column_spanner_outer:last-child {
+#lwjusvsboe .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#wydktkzpco .gt_column_spanner {
+#lwjusvsboe .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #000000;
@@ -926,11 +931,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   width: 100%;
 }
 
-#wydktkzpco .gt_spanner_row {
+#lwjusvsboe .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#wydktkzpco .gt_group_heading {
+#lwjusvsboe .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -956,7 +961,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   text-align: left;
 }
 
-#wydktkzpco .gt_empty_group_heading {
+#lwjusvsboe .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -971,15 +976,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: middle;
 }
 
-#wydktkzpco .gt_from_md > :first-child {
+#lwjusvsboe .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#wydktkzpco .gt_from_md > :last-child {
+#lwjusvsboe .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#wydktkzpco .gt_row {
+#lwjusvsboe .gt_row {
   padding-top: 3px;
   padding-bottom: 3px;
   padding-left: 5px;
@@ -998,7 +1003,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#wydktkzpco .gt_stub {
+#lwjusvsboe .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1011,7 +1016,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#wydktkzpco .gt_stub_row_group {
+#lwjusvsboe .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1025,15 +1030,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: top;
 }
 
-#wydktkzpco .gt_row_group_first td {
+#lwjusvsboe .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#wydktkzpco .gt_row_group_first th {
+#lwjusvsboe .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#wydktkzpco .gt_summary_row {
+#lwjusvsboe .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1043,16 +1048,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#wydktkzpco .gt_first_summary_row {
+#lwjusvsboe .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_first_summary_row.thick {
+#lwjusvsboe .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#wydktkzpco .gt_last_summary_row {
+#lwjusvsboe .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1062,7 +1067,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_grand_summary_row {
+#lwjusvsboe .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1072,7 +1077,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#wydktkzpco .gt_first_grand_summary_row {
+#lwjusvsboe .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1082,7 +1087,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_last_grand_summary_row_top {
+#lwjusvsboe .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1092,11 +1097,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_striped {
+#lwjusvsboe .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#wydktkzpco .gt_table_body {
+#lwjusvsboe .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -1105,7 +1110,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_footnotes {
+#lwjusvsboe .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1119,7 +1124,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_footnote {
+#lwjusvsboe .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -1128,7 +1133,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#wydktkzpco .gt_sourcenotes {
+#lwjusvsboe .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1142,7 +1147,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#wydktkzpco .gt_sourcenote {
+#lwjusvsboe .gt_sourcenote {
   font-size: 12px;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -1150,72 +1155,72 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#wydktkzpco .gt_left {
+#lwjusvsboe .gt_left {
   text-align: left;
 }
 
-#wydktkzpco .gt_center {
+#lwjusvsboe .gt_center {
   text-align: center;
 }
 
-#wydktkzpco .gt_right {
+#lwjusvsboe .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#wydktkzpco .gt_font_normal {
+#lwjusvsboe .gt_font_normal {
   font-weight: normal;
 }
 
-#wydktkzpco .gt_font_bold {
+#lwjusvsboe .gt_font_bold {
   font-weight: bold;
 }
 
-#wydktkzpco .gt_font_italic {
+#lwjusvsboe .gt_font_italic {
   font-style: italic;
 }
 
-#wydktkzpco .gt_super {
+#lwjusvsboe .gt_super {
   font-size: 65%;
 }
 
-#wydktkzpco .gt_footnote_marks {
+#lwjusvsboe .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#wydktkzpco .gt_asterisk {
+#lwjusvsboe .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#wydktkzpco .gt_indent_1 {
+#lwjusvsboe .gt_indent_1 {
   text-indent: 5px;
 }
 
-#wydktkzpco .gt_indent_2 {
+#lwjusvsboe .gt_indent_2 {
   text-indent: 10px;
 }
 
-#wydktkzpco .gt_indent_3 {
+#lwjusvsboe .gt_indent_3 {
   text-indent: 15px;
 }
 
-#wydktkzpco .gt_indent_4 {
+#lwjusvsboe .gt_indent_4 {
   text-indent: 20px;
 }
 
-#wydktkzpco .gt_indent_5 {
+#lwjusvsboe .gt_indent_5 {
   text-indent: 25px;
 }
 
-#wydktkzpco .katex-display {
+#lwjusvsboe .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#wydktkzpco div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#lwjusvsboe div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 
@@ -1248,60 +1253,60 @@ Attendance
 </thead>
 <tbody class="gt_table_body">
 <tr class="odd">
-<td class="gt_row gt_left" headers="name">Chief Moore</td>
-<td class="gt_row gt_right" headers="num_attended">10</td>
-<td class="gt_row gt_right" headers="num_reps">7</td>
-<td class="gt_row gt_right" headers="num_dems">3</td>
+<td class="gt_row gt_left" headers="name">President’s FY 2025 Budget Request for the U.S. Forest Service</td>
+<td class="gt_row gt_right" headers="num_attended">25</td>
+<td class="gt_row gt_right" headers="num_reps">14</td>
+<td class="gt_row gt_right" headers="num_dems">11</td>
 <td class="gt_row gt_center" headers="topics">Environment</td>
-<td class="gt_row gt_left" headers="summary">Chief Randy Moore testified before the subcommittee on the U.S. Forest Service's FY 2025 budget request. Despite receiving increased funding, the Forest Service plans to reduce timber harvesting targets due to challenges like litigation. The hearing addressed the need for improved management to handle wildfires and forest health. Moore emphasized progress in reducing wildfire risks and the importance of maintaining funded initiatives. Concerns included missed targets and underfunding critical programs like hazardous fuels reduction. Ongoing challenges include regulatory barriers and the need for sustainable funding and increased staffing.</td>
+<td class="gt_row gt_left" headers="summary">The hearing examined the President's budget request for the U.S. Forest Service, focusing on funding and management strategies to address wildfire crises, forest health, and firefighter support. The budget proposes $8.9 billion, including funds for hazardous fuels reduction and permanent pay increases for firefighters. Concerns were raised regarding the Forest Service’s ability to reduce wildfire risks and meet timber harvest goals. The need for regulatory reforms, funding continuity for long-term forest management, and enhancing forest products infrastructure were also discussed.</td>
 </tr>
 <tr class="even">
 <td class="gt_row gt_left" headers="name">SAFEGUARDING WORKERS’ RIGHTS AND LIBERTIES</td>
-<td class="gt_row gt_right" headers="num_attended">20</td>
+<td class="gt_row gt_right" headers="num_attended">21</td>
 <td class="gt_row gt_right" headers="num_reps">12</td>
-<td class="gt_row gt_right" headers="num_dems">8</td>
+<td class="gt_row gt_right" headers="num_dems">9</td>
 <td class="gt_row gt_center" headers="topics">Business</td>
-<td class="gt_row gt_left" headers="summary">The hearing focused on the proposed National Right to Work Act, which would restrict compulsory union membership and dues payment as employment conditions. Republican members advocated for the bill, highlighting the economic growth in right-to-work states and the importance of personal freedom. Democrats opposed the bill, citing the benefits unions offer, such as higher wages and better working conditions. Witnesses shared personal experiences of union membership, with some advocating for the right to refuse union dues, while others stressed union gains in labor rights and benefits.</td>
+<td class="gt_row gt_left" headers="summary">The hearing focused on the debate over the National Right to Work Act, aiming to eliminate compulsory union membership. Proponents argued that workers should not be forced to pay union dues, highlighting personal testimonies of pressure and threats faced by employees. Opponents contended that right-to-work laws weaken unions, reduce workers' wages, and limit resources for collective bargaining and training. The discussion underscored differing views on union influence, workers' rights, and economic impacts, with no consensus reached among the committee members.</td>
 </tr>
 <tr class="odd">
-<td class="gt_row gt_left" headers="name">Subcommittee on Interior, Environment, and Related Agencies – American Indian and Alaska Native Programs Hearing.</td>
-<td class="gt_row gt_right" headers="num_attended">10</td>
-<td class="gt_row gt_right" headers="num_reps">6</td>
-<td class="gt_row gt_right" headers="num_dems">4</td>
+<td class="gt_row gt_left" headers="name">American Indian and Alaska Native Public Witness Day 1—Morning Session</td>
+<td class="gt_row gt_right" headers="num_attended">15</td>
+<td class="gt_row gt_right" headers="num_reps">9</td>
+<td class="gt_row gt_right" headers="num_dems">6</td>
 <td class="gt_row gt_center" headers="topics">Environment</td>
-<td class="gt_row gt_left" headers="summary">The Subcommittee on Interior, Environment, and Related Agencies held a hearing focused on American Indian and Alaska Native programs, discussing key issues like mining reclamation, law enforcement funding deficits, and environmental impacts affecting tribes. Witnesses emphasized the needs for increased support and funding to manage these indigenous communities' critical programs more effectively. The session highlighted recurring challenges such as environmental degradation from historical mining, jurisdictional issues in law enforcement, and insufficient Federal commitments to treaty obligations.</td>
+<td class="gt_row gt_left" headers="summary">The hearing focused on the needs of American Indian and Alaska Native communities, emphasizing the importance of honoring treaty obligations. Key issues discussed included the environmental cleanup of the Gay Mine Site, inadequate law enforcement funding, and poor road maintenance. Witnesses, including Lee Juan Tyler, highlighted the long-standing neglect in these areas and the necessity for increased funding and strategic planning to improve the living conditions and safety of their communities.</td>
 </tr>
 <tr class="even">
-<td class="gt_row gt_left" headers="name">Oversight of the Department of Transportation’s Policies and Programs and Fiscal Year 2025 Budget Request</td>
-<td class="gt_row gt_right" headers="num_attended">60</td>
-<td class="gt_row gt_right" headers="num_reps">33</td>
-<td class="gt_row gt_right" headers="num_dems">27</td>
-<td class="gt_row gt_center" headers="topics">Technology</td>
-<td class="gt_row gt_left" headers="summary">During the hearing on the oversight of the Department of Transportation's policies and programs, Secretary Pete Buttigieg discussed efforts to address infrastructure and transportation challenges, including the funding and progress of projects under the Bipartisan Infrastructure Law (BIL). There was discussion on issues like the appeal of a court ruling on the Federal Highway Administration’s emissions performance measure, and concerns regarding marijuana testing regulations for commercial drivers. Secretary Buttigieg emphasized continued infrastructure improvements across the U.S. and the importance of rail and road safety.</td>
+<td class="gt_row gt_left" headers="name">Oversight of the Department of Transportation's Policies and Programs and Fiscal Year 2025 Budget Request</td>
+<td class="gt_row gt_right" headers="num_attended">54</td>
+<td class="gt_row gt_right" headers="num_reps">28</td>
+<td class="gt_row gt_right" headers="num_dems">26</td>
+<td class="gt_row gt_center" headers="topics">Business</td>
+<td class="gt_row gt_left" headers="summary">The hearing assessed the Department of Transportation's policies and programs with a focus on the FY 2025 budget request. Secretary Pete Buttigieg discussed infrastructure projects backed by the Bipartisan Infrastructure Law, emphasizing improvements in transportation infrastructure like bridges, airports, and rail systems. The FAA Reauthorization Act of 2024 and its implementation also featured prominently. Additionally, attention was given to rail safety regulations following recent incidents, such as the Norfolk Southern derailment in East Palestine. The hearing underscored ongoing legislative efforts essential for furthering rail and general transportation safety.</td>
 </tr>
 <tr class="odd">
 <td class="gt_row gt_left" headers="name">SECURITY RISK: THE UNPRECEDENTED SURGE IN CHINESE ILLEGAL IMMIGRATION</td>
-<td class="gt_row gt_right" headers="num_attended">10</td>
-<td class="gt_row gt_right" headers="num_reps">5</td>
-<td class="gt_row gt_right" headers="num_dems">5</td>
+<td class="gt_row gt_right" headers="num_attended">8</td>
+<td class="gt_row gt_right" headers="num_reps">3</td>
+<td class="gt_row gt_right" headers="num_dems">3</td>
 <td class="gt_row gt_center" headers="topics">Immigration</td>
-<td class="gt_row gt_left" headers="summary">The hearing before the Subcommittee on Oversight, Investigations, and Accountability examined the surge in illegal immigration by Chinese nationals across the U.S. southern border. Witnesses testified that this increase could pose national security risks and is partly driven by China's economic instability and political repression, as well as organized smuggling operations. Discussion also highlighted the lack of comprehensive vetting processes and China's limited cooperation in repatriating its nationals. Members expressed concerns about potential espionage and the need for legislative actions to address these challenges effectively.</td>
+<td class="gt_row gt_left" headers="summary">The hearing examined the surge of Chinese nationals illegally entering the U.S. via the southern border, raising national security concerns. The discussion highlighted economic instability and political repression in China as push factors, with Chinese nationals using social media to organize journeys. There were concerns over inadequate vetting processes at the U.S. border, which might allow individuals with malicious intent to enter. Recommendations included strengthening border security and enhancing interagency collaboration to counter Chinese influence and ensure national safety. Historical perspectives on Chinese immigration and its challenges were also considered.</td>
 </tr>
 <tr class="even">
-<td class="gt_row gt_left" headers="name">Housing Unaffordability Hearing</td>
-<td class="gt_row gt_right" headers="num_attended">13</td>
+<td class="gt_row gt_left" headers="name">The Costs of Inaction: Economic Risks from Housing Unaffordability</td>
+<td class="gt_row gt_right" headers="num_attended">20</td>
 <td class="gt_row gt_right" headers="num_reps">6</td>
-<td class="gt_row gt_right" headers="num_dems">7</td>
+<td class="gt_row gt_right" headers="num_dems">14</td>
 <td class="gt_row gt_center" headers="topics">Housing</td>
-<td class="gt_row gt_left" headers="summary">The Senate Budget Committee hearing focused on the economic risks of housing unaffordability. Witnesses discussed the pressing need for increased housing production to address shortages that drive up costs. Several strategies were explored, including tax credits, reducing regulatory barriers, and leveraging surplus federal lands. The complexities of housing finance were also highlighted, emphasizing the need for more liquidity. Speaker Joseph Shekarchi showcased Rhode Island's initiatives, stressing the importance of bipartisan support and federal partnership in resolving the crisis. The overarching sentiment was that both state and federal efforts are essential to improve housing affordability.</td>
+<td class="gt_row gt_left" headers="summary">The hearing examined the economic risks associated with housing unaffordability in the U.S. Witnesses, including Rhode Island's House Speaker, experts from housing-related organizations, and economists, discussed various aspects of the housing crisis. They highlighted the shortage of affordable housing and the rising costs, partly due to regulatory barriers and insufficient supply. Proposals discussed included increasing housing production, reforming zoning laws, and revisiting federal housing policies. The debate also touched on the impact of federal fiscal policies on housing markets. Various models and solutions were proposed to boost housing supply, affordability, and ownership.</td>
 </tr>
 <tr class="odd">
-<td class="gt_row gt_left" headers="name">FIGHTING FRAUD: HOW SCAMMERS ARE STEALING FROM OLDER ADULTS HEARING</td>
-<td class="gt_row gt_right" headers="num_attended">7</td>
-<td class="gt_row gt_right" headers="num_reps">4</td>
-<td class="gt_row gt_right" headers="num_dems">3</td>
+<td class="gt_row gt_left" headers="name">FIGHTING FRAUD: HOW SCAMMERS ARE STEALING FROM OLDER ADULTS</td>
+<td class="gt_row gt_right" headers="num_attended">8</td>
+<td class="gt_row gt_right" headers="num_reps">3</td>
+<td class="gt_row gt_right" headers="num_dems">5</td>
 <td class="gt_row gt_center" headers="topics">Law Enforcement</td>
-<td class="gt_row gt_left" headers="summary">The hearing focused on how scammers are targeting older adults, particularly through sophisticated scams involving technology, like phishing and tech-support scams. Witnesses, including representatives from AARP and law enforcement, discussed the rising trends in financial and emotional impacts these scams have on seniors, highlighting the need for better fraud prevention education, tighter regulations on cryptographic transactions, and stronger law enforcement collaboration. Recommendations included greater public education, industry accountability, and changes in the law to allow tax relief for fraud victims.</td>
+<td class="gt_row gt_left" headers="summary">The hearing focused on scams targeting older adults, leading to significant losses, estimated by the FTC to be $137 billion due to underreporting. Witnesses discussed various scams, including tech support and cryptocurrencies, and emphasized the importance of reporting these crimes to aid law enforcement efforts. Emotional and financial impacts on victims were significant, and policy recommendations included reinstating the casualty loss deduction and enhancing regulation of cryptocurrency ATMs. Calls were made for a coordinated national strategy to combat these scams, involving education, technology improvements, and stronger law enforcement collaboration.</td>
 </tr>
 </tbody>
 </table>
@@ -1310,7 +1315,7 @@ Attendance
 </div>
 </div>
 <p>Now the reader has a succinct summary of each hearing and can perform analysis on attendance by topic in order to derive which topics may be the most important to the congress.</p>
-<p>Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the return type options the model picks from, then the model finds stronger, more informative insights.</p>
+<p>Modifying the return types further would provide a clearer look at which topics congress discusses. If the programmer prudently limits the return type options the model picks from, then the model finds stronger, more enriched insights.</p>
 
 
 </section>
