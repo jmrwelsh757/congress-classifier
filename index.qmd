@@ -1,5 +1,5 @@
 ---
-title: "Classifying U.S. Congress with AI"
+title: "AI Data Enrichment of U.S. Congressional Hearings Data"
 author: "Joseph Welsh"
 ---
 ## Summary
@@ -42,7 +42,7 @@ pull_chrg =
            "offsetMark=%2A&",
            "api_key=",
            key)
-    jsonlite::fromJSON(url)$packages %>% 
+    jsonlite::fromJSON(url)$packages |> 
       select(packageId, title, 
              packageLink, congress, 
              dateIssued)
@@ -59,10 +59,10 @@ gov_packages =
             pageSize = 7,
             congress= 118)
 gov_zips = 
-  gov_packages %>% 
+  gov_packages |> 
   mutate(zips = paste0(str_replace(packageLink, "summary", "zip"),
-                       "?api_key=", Sys.getenv("GOV_API_KEY"))) %>% 
-  mutate(destfiles = paste0("zips/",packageId,".zip")) %>% 
+                       "?api_key=", Sys.getenv("GOV_API_KEY"))) |> 
+  mutate(destfiles = paste0("zips/",packageId,".zip")) |> 
   select(zips, destfiles, packageId)
 
 options(timeout=1500)
@@ -74,33 +74,28 @@ map2(gov_zips$zips,gov_zips$destfiles,
 ```{r pdf_load, eval=FALSE, echo=TRUE}
 
 pdf_df = 
-  ##this was rev one which directly continued with downloaded files instead of reading in from dir.
-  # gov_zips %>%
-  # mutate(fname = paste0("zips/", gov_zips$packageId,
-  #                       "/pdf/", 
-  #                       gov_zips$packageId, ".pdf")) %>% 
-  # rowwise() %>% 
-  # mutate(
-  #   text = list(unzip(destfiles,list = T)$Name)
-  #     ) %>% 
-  
-    ##this is rev two reading in already downloaded files from dir
-  tibble(text = list.files(recursive = TRUE)) %>% 
-  # unnest_longer(col = text) %>% 
-  filter(str_detect(text,".pdf")) %>% 
-  # rowwise() %>% 
+  gov_zips |>
+  mutate(fname = paste0("zips/", gov_zips$packageId,
+                        "/pdf/",
+                        gov_zips$packageId, ".pdf")) |>
+  rowwise() |>
+  mutate(
+    text = list(unzip(destfiles,list = T)$Name)
+      ) |>
+  unnest_longer(col = text) |>
+  rowwise() |>
   mutate(
     # text = list(unzip(destfiles,files = text)),
     pdfText = map(text, pdftools::pdf_text)
-      ) %>% 
-  unnest_longer(col = pdfText) %>% 
+      ) |> 
+  unnest_longer(col = pdfText) |> 
   transmute(pdfText = str_squish(pdfText),
          packageId = str_sub(text, 
                              start = 1,
-                             end = str_locate(text,"/")[2] - 1)) %>% 
-  aggregate(pdfText ~ packageId, FUN = paste, collapse = "") %>% 
-  mutate(text=map(pdfText,\(hearing){word(hearing, 1, (30000/2) )})) %>% #max tokens divided by average tokens per word in English (1.5) plus .5 since congress likes the big words
-  select(name=packageId, text) %>% 
+                             end = str_locate(text,"/")[2] - 1)) |> 
+  aggregate(pdfText ~ packageId, FUN = paste, collapse = "") |> 
+  mutate(text=map(pdfText,\(hearing){word(hearing, 1, (30000/2) )})) |> #max tokens divided by average tokens per word in English (1.5) plus .5 since congress likes the big words
+  select(name=packageId, text) |> 
   filter(!is.na(text))
 
 ```
@@ -108,8 +103,8 @@ pdf_df =
 
 ```{r gt_preview}
 
-pdf_df[1,] %>% 
-  mutate(text = str_trunc(text,450)) %>% 
+pdf_df[1,] |> 
+  mutate(text = str_trunc(text,450)) |> 
   gt::gt()
 
 ```
@@ -128,7 +123,7 @@ get_gpt_summary =
     
     type_summary <- type_object(
       "Summary of hearing.",
-      name = type_string("Name."),
+      name = type_string("Title of the hearing."),
       num_attended = type_integer("Number of congress people in attendance."),
       num_reps = type_integer("Number of republican congress people in attendance."),
       num_dems = type_integer("Number of democrat congress people in attendance."),
@@ -160,7 +155,7 @@ get_gpt_summary =
 
 
 out_df = 
-    pdf_df %>% 
+    pdf_df |> 
     transmute(responses = 
                 map(text, get_gpt_summary,
                     .progress = TRUE))
@@ -175,22 +170,22 @@ Now that the chatbot has been able to read the text of the pdfs and return answe
 
 library(gt)
 library(gtExtras)
-out_df %>% 
-  unnest_wider(responses) %>% 
-  gt() %>% 
+out_df |> 
+  unnest_wider(responses) |> 
+  gt() |> 
   tab_header(title = "U.S. Congressional Hearings",
-             subtitle = "AI summary of hearings based on pdf text extracted from the U.S. Government API") %>% 
+             subtitle = "AI summary of hearings based on pdf text extracted from the U.S. Government API") |> 
   tab_spanner(label = "Attendance",
-              columns = num_attended:num_dems) %>% 
+              columns = num_attended:num_dems) |> 
   cols_label(num_attended="total",
              num_reps="republicans",
              num_dems="democrats",
-             topics="topic") %>% 
+             topics="topic") |> 
   cols_width(name ~ px(70),
              num_reps ~ px(90),
              num_dems ~ px(90),
              num_attended ~ px(50),
-             topics ~ px(90)) %>% 
+             topics ~ px(90)) |> 
   gt_theme_538()
 
 ```
